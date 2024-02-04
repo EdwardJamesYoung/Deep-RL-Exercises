@@ -1,0 +1,151 @@
+\documentclass[]{article}
+
+% Formatting packages
+\usepackage[margin = 3cm]{geometry}
+\usepackage{parskip}
+
+% For writing psuedocode
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% Fonts and other symbols
+\usepackage{bm}
+\usepackage{mathtools}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+
+% Making pretty pictures
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+
+% Misc.
+\usepackage{hyperref}
+
+% Linear Algebra Macros
+\newcommand{\Mat}{\mathrm{Mat}}
+\newcommand{\Img}{\mathrm{Img}}
+\newcommand{\Ker}{\mathrm{Ker}}
+\newcommand{\tr}{\mathrm{tr}}
+\newcommand{\adj}{\mathrm{adj}}
+\newcommand{\diag}{\mathrm{diag}}
+\newcommand{\tbt}[4]{\begin{pmatrix} #1 & #2 \\ #3 & #4 \end{pmatrix}}
+
+% Probability theory Macros
+\renewcommand{\P}{\mathbb{P}}
+\newcommand{\Cov}{\mathrm{Cov}}
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Poi}{\mathrm{Poisson}}
+\newcommand{\Geo}{\mathrm{Geo}}
+\newcommand{\Bin}{\mathrm{Bin}}
+\newcommand{\Bern}{\mathrm{Bern}}
+\newcommand{\iid}{\stackrel{\text{i.i.d.}}{\sim}}
+
+% Misc. 
+\newcommand{\defeq}{\vcentcolon =}
+\newcommand{\pd}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\dd}[2]{\frac{d #1}{d #2}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\Z}{\mathbb{Z}}
+
+% Text Macros
+\newcommand{\etal}{\emph{et al.}}
+\newcommand{\eg}{\emph{e.g.}}
+\newcommand{\ie}{\emph{i.e.}}
+\newcommand{\etc}{\emph{etc.}}
+
+
+%opening
+\title{}
+\author{Edward Young \\ \large ey245@cam.ac.uk}
+\date{}
+
+\begin{document}
+
+\section*{DQN \\ \small Edward Young - ey245@cam.ac.uk}
+
+\subsection*{Quick facts}
+\begin{enumerate}
+	\item DQN is an \emph{action-value method}. 
+	\item DQN is \emph{off-policy}.
+	\item DQN is \emph{model-free}.
+	\item DQN is applicable to any kind of state space but only \emph{discrete} action spaces.
+\end{enumerate}
+
+
+\subsection*{Recap: Optimal action values}
+\begin{itemize}
+	\item The \textbf{optimal action value function} $Q^*(S,A)$ tells us the value of being in state $S$ and performing action $A$, provided we then follow the optimal policy $\mu^*$.
+	\item In each state, the \textbf{optimal policy} $\mu^*$ chooses the action which maximises the optimal action value function. 
+	\item Mathematically, this can be expressed as
+	\begin{equation}\label{eq:optimal policy from optimal values}
+		\mu^*(S) = \arg\max_A Q^*(S,A)
+	\end{equation}
+	\item The optimal action value function satisfies the \emph{Bellman optimality equation}:
+	\begin{equation}\label{eq:Bellman Optimality}
+		Q^*(S,A) = R(S,A) + \gamma \sum_{S' \in \mathcal{S}} p(S'|S,A) \max_{A'} Q^*(S',A')
+	\end{equation}
+\end{itemize} 
+
+\subsection*{Trick: Q-learning}
+Equation (\ref{eq:optimal policy from optimal values}) suggests the following strategy for getting good behaviour:
+\begin{enumerate}
+	\item Use a neural network called the \textbf{value network}, $Q(S,A;\phi)$,  to learn an approximation to $Q^*$, \ie, $Q(S,A;\phi) \approx Q^*(S,A)$ from data. The value network takes in states and outputs an estimate of the value of each action in that state. 
+	\item Motivated by (\ref{eq:optimal policy from optimal values}), select actions to maximise our approximation, \ie, pursue the policy $\mu$ given by 
+	\begin{equation}\label{eq:policy from approximate optimal values}
+		\mu(S) = \arg\max_A Q(S,A;\phi)
+	\end{equation}
+\end{enumerate}
+The idea of learning an approximation to the optimal action value function is called \textbf{Q-learning}
+
+\subsection*{Trick: Bellman consistency}
+How can we train the value network $Q(S,A;\phi)$ to approximate the optimal value function? Equation (\ref{eq:Bellman Optimality}) is both \emph{necessary} and \emph{sufficient} for $Q^*$. We therefore train $Q(S,A;\phi)$ to satisfy this equation, by minimising a \textbf{loss function} called the \textbf{mean squared Bellman error}:
+\begin{equation}\label{eq:loss function}
+	\mathcal{L}(\phi) = \frac{1}{N} \sum_{i=1}^N \left( Q(S_i,A_i;\phi) - y_i \right)^2 
+\end{equation}
+where 
+\begin{equation}
+	y_i = R_i + \gamma \sum_{S'\in \mathcal{S}} p(S'|S_i,A_i) \max_{A'} Q(S',A';\phi)
+\end{equation}
+You may recognise this as the \emph{Mean Squared Error} for a regression problem. 
+
+\subsection*{Trick: Sampling}
+We will make two modifications to this objective. Firstly, forming the regression targets $y_i$ requires taking an expectation over next states $S'$. This requires a distributional model of the environmental dynamics. Instead, we will replace expectation over $S'$ by a \textbf{sample} of the next state, which can be gathered by interactions with the environment:
+\begin{equation}
+	y_i = R_i + \gamma \max_{A'} Q(S'_i,A';\phi)~\text{where}~S'_i \sim p(S'|S_i,A_i)
+\end{equation}
+
+\subsection*{Trick: Target network}
+Secondly, the regression targets $y_i$ at present depends on the value network. This means that the regression targets themselves move around as we update the parameters. This can lead to instability in learning. Instead, we replace the value network in the regression targets with a \textbf{target network}, which has the same architecture as the value network but uses \textbf{lagged parameters} $\phi^-$. 
+\begin{equation}\label{eq:regression targets final}
+	y_i = R_i + \gamma \max_{A'} Q(S'_i,A';\phi^-)
+\end{equation}
+The parameters of the target network are periodically \textbf{synchronised} with those of the value network:
+\begin{equation}\label{eq:synchronisation}
+	\phi^- \gets \phi
+\end{equation}
+
+\subsection*{Trick: Experience Replay buffer}
+
+We now have a loss function that we can use to train our network. This loss function makes use of a \textbf{batch} of $N$ state-action-reward-state transitions $S_i, A_i, R_i, S'_i$. These are taken from a \textbf{replay buffer}. This is a collection of $M \gg N$ ``memories'' of such transitions taken from interacting with the environment.  
+
+\subsection*{Trick: $\epsilon$-greedy policy}
+
+When the agent interacts with the environment, it must do so according to a policy. We have already reasoned that at \textbf{test time} we should use equation (\ref{eq:policy from approximate optimal values}) to select actions. However, when gathering experience during \textbf{training time}, we want to generate an \emph{diversity} of experiences. We therefore select actions according to an \textbf{$\epsilon$-greedy policy}. Given a state $S$, with probability $1 - \epsilon$ we select the action $A$ that maximises $Q(S,A;\phi)$. With probability $\epsilon$, we randomly select an action. The $\epsilon$-greedy policy provides a trade-off between \textbf{exploration} of the environment for potentially new promising strategies and \textbf{exploitation} of known good strategies. 
+
+\subsection*{Conclusion: Putting it together}
+
+DQN uses two networks, the \textbf{value network} (with parameters $\phi$) and the \textbf{target network} (with parameters $\phi^-$). There are three processes occurring on gradually longer timescales:
+
+\begin{enumerate}
+	\item Gather experience using an \textbf{$\epsilon$-greedy policy} and load that experience into the \textbf{replay buffer}. 
+	\item Every $10$ interaction steps, randomly sample $N$ transitions from the replay buffer. Form \textbf{regression targets} using equation (\ref{eq:regression targets final}) and minimise the \textbf{loss} given equation (\ref{eq:loss function}). 
+	\item Every $1000$ gradient steps, \textbf{synchronise} the target network parameters by equation (\ref{eq:synchronisation}).
+\end{enumerate}
+Typically we take the \textbf{batch size} $N = 32$ and the \textbf{memory capacity} of the replay buffer to be $M = 10000$ transitions. All of the numbers in this section can be played with to increase performance!
+
+\end{document}

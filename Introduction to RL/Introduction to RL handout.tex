@@ -1,0 +1,138 @@
+\documentclass[]{article}
+
+% Formatting packages
+\usepackage[margin = 3cm]{geometry}
+\usepackage{parskip}
+
+% For writing psuedocode
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% Fonts and other symbols
+\usepackage{bm}
+\usepackage{mathtools}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+
+% Making pretty pictures
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+
+% Misc.
+\usepackage{hyperref}
+
+% Linear Algebra Macros
+\newcommand{\Mat}{\mathrm{Mat}}
+\newcommand{\Img}{\mathrm{Img}}
+\newcommand{\Ker}{\mathrm{Ker}}
+\newcommand{\tr}{\mathrm{tr}}
+\newcommand{\adj}{\mathrm{adj}}
+\newcommand{\diag}{\mathrm{diag}}
+\newcommand{\tbt}[4]{\begin{pmatrix} #1 & #2 \\ #3 & #4 \end{pmatrix}}
+
+% Probability theory Macros
+\renewcommand{\P}{\mathbb{P}}
+\newcommand{\Cov}{\mathrm{Cov}}
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Poi}{\mathrm{Poisson}}
+\newcommand{\Geo}{\mathrm{Geo}}
+\newcommand{\Bin}{\mathrm{Bin}}
+\newcommand{\Bern}{\mathrm{Bern}}
+\newcommand{\iid}{\stackrel{\text{i.i.d.}}{\sim}}
+
+% Misc. 
+\newcommand{\defeq}{\vcentcolon =}
+\newcommand{\pd}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\dd}[2]{\frac{d #1}{d #2}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\Z}{\mathbb{Z}}
+
+% Text Macros
+\newcommand{\etal}{\emph{et al.}}
+\newcommand{\eg}{\emph{e.g.}}
+\newcommand{\ie}{\emph{i.e.}}
+\newcommand{\etc}{\emph{etc.}}
+
+
+%opening
+\title{}
+\author{Edward Young \\ \large ey245@cam.ac.uk}
+\date{}
+
+\begin{document}
+
+\section*{Introduction to Reinforcement Learning \\ \small Edward Young - ey245@cam.ac.uk}
+
+
+\subsection*{States, Actions, and Rewards}
+\begin{itemize}
+	\item RL involves an interaction between an \textbf{agent} and an \textbf{environment}.  
+	\item The agent chooses an \textbf{action} to take based upon the current \textbf{state} of the environment. 
+	\item As a result of that action, the environment returns a \textbf{reward}, and transitions to a new state.
+	\item The collection of states for the environment is the \textbf{state space}, which we denote by $\mathcal{S}$ 
+	\item The collection of actions for the environment is the \textbf{action space}, which we denote by $\mathcal{A}$ 
+	\item The environment is characterised by a \textbf{dynamics} function and a \textbf{reward} function. 
+	\begin{enumerate}
+		\item The dynamics function gives the probability of transitioning into state $S'$, given that you take action $A$ in state $S$. This is denoted $p(S'|S,A)$.
+		\item The reward function indicates the reward that the agent receives for being in state $S$ and taking action $A$. This is denoted $R(S,A)$. 
+	\end{enumerate}
+	\item The interaction between the agent and the environment continues until we reach a \textbf{terminal state}. 
+\end{itemize}
+
+\subsection*{Policies}
+
+An agent's \textbf{policy} dictates how the agent behaves in response to being in a particular state. 
+\begin{enumerate}
+	\item A \textbf{deterministic policy} takes in a state, and returns the action that the agent takes in that state. We will denote deterministic policies by $\mu(S) \in \mathcal{A}$ 
+	\item A \textbf{stochastic policy} takes in a state, and returns a probability distribution over actions that the agent could take. We will denote stochastic policies by $\pi(A|S)$
+\end{enumerate}
+
+
+\subsection*{Reward, Return, and Value}
+
+The \textbf{return} at time $t$ is the sum of rewards obtained after time $t$ until the time $T$ at which the terminal state is reached, discounted according to how far in the future they are:
+\[ G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \gamma^3 R_{t+4} + \dots + \gamma^{T-t-1} R_T = \sum_{k=0}^{T-t-1} \gamma^k R_{t+k+1}  \] 
+We call $\gamma$ the \textbf{discount rate}. The discount rate quantifies how much we weight we place on nearby rewards vs. distant rewards. 
+\begin{enumerate}
+	\item The \textbf{state value function} is the expected return, conditional on being in a particular state: \[ V_\mu(S) = \E_\mu[ G_t | S_t = S] \]
+	\item The \textbf{action value function} is the expected return, conditional on being in a particular state $S$ and taking a particular action $A$: \[ Q_\mu(S,A) = \E_\mu[ G_t | S_t = S, A_t = A ] \]
+\end{enumerate}
+Note that value functions \emph{depend on the policy}: the value of being in a particular state (or being in a state and taking an action) depends on how we behave afterwards. 
+
+\subsection*{Optimal Policies and Values}
+
+We define the \textbf{optimal action value function} to be the greatest possible value, over all possible policies: \[ Q^*(S,A) = \max_\mu Q_\mu(S,A) \]
+
+The \textbf{optimal policy} is the policy which, for each state, selects the action which maximises the optimal action value function: \[ \mu^*(S) = \arg\max_A Q^*(S,A) \]
+
+The optimal action value function is the action value function for the optimal policy, \ie \[ Q^*(S,A) = Q_{\mu^*}(S,A) \] 
+
+The optimal value function satisfies the \textbf{Bellman optimality equation} \[ Q^*(S,A) = R(S,A) + \gamma \sum_{S' \in \mathcal{S}} p(S'|S,A) \max_{A'} Q^*(S',A') \]
+
+\subsection*{Types of RL algorithms}
+
+\begin{itemize}
+	\item \textbf{Model-based vs. Model-free}. A model-based method is a method that requires us to either use the dynamics function or an estimate of it. A model-free method does not have such requirements. Almost all algorithms we will be covering are model-free.
+	\item \textbf{On-policy vs. Off-policy}. An on-policy algorithm attempts to learn the value function of the policy being used by the agent. An off-policy algorithm attempts to learn a different value function, typically the optimal value function. We will start with off-policy algorithms and then move onto on-policy algorithms.
+	\item \textbf{Action-value vs. policy-gradient}. An action-value method attempts to learn only a value function. A policy-gradient method additionally attempts to learn a policy as well. We will begin with an action-value method and then move onto policy-gradient methods. 
+\end{itemize}
+
+
+\subsection*{Appendix: Mathematical notation}
+Here we list some mathematical notation and symbols for those who haven't encountered them before:
+\begin{itemize}
+	\item $\in$ should be read as \emph{in}
+	\item $|$ should be read as \emph{given that}
+	\item $\E$ should be read as \emph{the expected value of}
+	\item $\sum$ should be read as \emph{the sum of}
+	\item $\max$ is the largest value of something
+	\item $\arg\max$ is the value which maximises something, \ie the value at which the maximum is attained
+\end{itemize}
+
+
+\end{document}
