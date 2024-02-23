@@ -1,0 +1,173 @@
+\documentclass[]{article}
+
+% Formatting packages
+\usepackage[margin = 3cm]{geometry}
+\usepackage{parskip}
+
+% For writing psuedocode
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% Fonts and other symbols
+\usepackage{bm}
+\usepackage{mathtools}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+
+% Making pretty pictures
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+
+% Misc.
+\usepackage{hyperref}
+\usepackage{soul}
+
+% Linear Algebra Macros
+\newcommand{\Mat}{\mathrm{Mat}}
+\newcommand{\Img}{\mathrm{Img}}
+\newcommand{\Ker}{\mathrm{Ker}}
+\newcommand{\tr}{\mathrm{tr}}
+\newcommand{\adj}{\mathrm{adj}}
+\newcommand{\diag}{\mathrm{diag}}
+\newcommand{\tbt}[4]{\begin{pmatrix} #1 & #2 \\ #3 & #4 \end{pmatrix}}
+
+% Probability theory Macros
+\renewcommand{\P}{\mathbb{P}}
+\newcommand{\Cov}{\mathrm{Cov}}
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Poi}{\mathrm{Poisson}}
+\newcommand{\Geo}{\mathrm{Geo}}
+\newcommand{\Bin}{\mathrm{Bin}}
+\newcommand{\Bern}{\mathrm{Bern}}
+\newcommand{\iid}{\stackrel{\text{i.i.d.}}{\sim}}
+
+% Misc. 
+\newcommand{\defeq}{\vcentcolon =}
+\newcommand{\pd}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\dd}[2]{\frac{d #1}{d #2}}
+\newcommand{\dt}[1]{\frac{d #1}{dt}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\Z}{\mathbb{Z}}
+
+% Text Macros
+\newcommand{\etal}{\emph{et al.}}
+\newcommand{\eg}{\emph{e.g.}}
+\newcommand{\ie}{\emph{i.e.}}
+\newcommand{\etc}{\emph{etc.}}
+
+
+%opening
+\title{}
+\author{Edward Young \\ \large ey245@cam.ac.uk}
+\date{}
+
+\begin{document}
+
+\section*{Deep Deterministic Policy Gradients \\ \small Edward Young - ey245@cam.ac.uk}
+
+\subsection*{Quick facts}
+\begin{enumerate}
+	\item DDPG is a (deterministic) \emph{policy gradient method}. 
+	\item DDPG is \emph{off-policy}.
+	\item DDPG is \emph{model-free}.
+	\item DDPG is applicable to any kind of state space but only \emph{continuous} action spaces.
+	\item DDPG is an \emph{actor-critic} method, this means that it learns both a policy (an \emph{actor}) and a value function (a \emph{critic}). 
+\end{enumerate}
+
+\subsection*{High-level strategy}
+DDPG uses both policy networks and value networks, making it an \textbf{actor-critic} method. As with most actor critic methods, the value network (the critic) is trained in a manner similar to the method used in DQN - by using bootstrapping to form regression targets and then minimising a mean squared error. The policy network (the actor) is trained to output actions that are better, according to the value network (the critic). \ul{The function of the value network is to critique the action selection of the policy network }.
+
+\iffalse
+\subsection*{Policy network}
+\begin{enumerate}
+	\item DDPG uses a neural network with parameters $\theta$ to learn a \textbf{deterministic policy}, $\mu(S;\theta)$
+	\item This network takes in states, and specifies the action performed by the agent in that state. 
+	\item We will train this neural network by performing gradient \emph{ascent} on the \textbf{value of the initial state}. This is equivalent to maximising the expected return at the first time-step, or maximising the expectation of the (discounted) sum of rewards across the episode:
+	\begin{equation}
+		J = V_\mu(S_0) = \E_\mu[G_0] = \E_\mu\left[  \sum_{t=1}^T \gamma^{t-1} R_t \right] 
+	\end{equation}
+	\item The \textbf{Deterministic Policy Gradient Theorem} states that (under certain technical conditions):
+	\begin{equation}\label{eq:Deterministic policy gradient theorem}
+		\nabla_\theta J = \E_\mu\left[ \nabla_\theta \mu(S;\theta) \nabla_A Q_\mu(S,A) |_{A = \mu(S;\theta)}  \right]
+	\end{equation}
+\end{enumerate}
+
+\subsection*{High-level plan}
+DDPG uses both a policy network and a 
+The suggests the following strategy for training the policy network:
+\begin{enumerate}
+	\item Use a neural network to learn an approximation to $Q_\mu(S,A)$ (similarly to in DQN).
+	\item Use this approximation to learn a policy using the deterministic policy gradient theorem. 
+\end{enumerate}
+
+
+\fi
+
+
+\subsection*{Networks}
+As with DQN, we will use two networks which approximate the action-value function:
+\begin{enumerate}
+	\item The \textbf{value network}, $Q(S,A;\phi)$ which uses the parameters $\phi$.
+	\item The \textbf{target value network}, $Q(S,A;\phi^-)$ which has the same architecture as the value network, but uses a lagged set of parameters $\phi^-$.
+\end{enumerate}
+Note that unlike DQN, both these networks take in \emph{state-action pairs} and output a single value, rather than taking in states and outputting the value for each action in that state. In addition to two networks for action-value function approximation, we will also use two networks which take in states and output an action for each state:
+\begin{enumerate}
+	\item The \textbf{policy network}, $\mu(S;\theta)$, which uses parameters $\theta$.
+	\item The \textbf{target policy network}, $\mu(S;\theta^-)$, which has the same architecture as the policy network, but uses a lagged set of parameters $\theta^-$
+\end{enumerate}
+
+\subsection*{Training the base networks}
+
+We now address updating the parameters of the value network $\phi$ and of the policy network $\theta$. To do this, we sample a \textbf{batch} of $N$ transitions from a \textbf{memory replay buffer} (just like with DQN). A transition consists of a state, action, reward, and next state, $(S, A, R, S')$. 
+
+The parameters of the value network will be learned by performing gradient descent on the \textbf{mean squared error loss}:
+\begin{equation}\label{eq:loss function for value network}
+	\mathcal{L}(\phi) = \frac{1}{N} \sum_{i=1}^N \left( Q(S_i,A_i;\phi) - y_i \right)^2 
+\end{equation}
+where the \textbf{regression targets} $y_i$ are formed via the following formula:
+\begin{equation}\label{eq:regression targets DDPG}
+	y_i = R_i + \gamma Q(S'_i,\mu(S'_i;\theta^-);\phi^-)
+\end{equation}
+\underline{The regression targets are formed using the target networks}. Note that this is almost the same formula that we used for the regression targets in DQN, except that the next-step action is chosen according to the target policy rather than by taking a maximum. 
+
+The parameters of the policy network are learned by performing gradient ascent on the \textbf{mean action value objective}:
+\begin{equation}\label{eq:objective function for policy network}
+	J(\theta) = \frac{1}{N} \sum_{n=1}^N Q(S_i, \mu(S_i;\theta); \phi^-) 
+\end{equation}
+This encourages the policy network to output actions that have a higher value, according to the target value function. This choice of objective is justified by the \textbf{Deterministic Policy Gradient Theorem}, which shows that maximising this objective approximates maximising the total reward accumulated across the episode. 
+
+\subsection*{Updating the target networks}
+To update the target networks we will use \textbf{Polyak averaging}. This means we take a weighted average of the current target network parameters and the current base network parameters. The update rules are:
+\begin{equation}\label{eq:Polyak averaging}
+	\phi^- \gets \rho \phi^- + (1 - \rho)\phi,~\theta^- \gets \rho \theta^- + (1 - \rho)\theta
+\end{equation}
+$\rho$ is the \textbf{Polyak parameter}, with $1 - \rho$ analogous to the \textbf{learning rate}. We perform Polyak averaging whenever we update the base network parameters. Note that Polyak averaging with $\rho = 1$ results in no learning, whereas when $\rho = 0$ we recover the \textbf{synchronisation} rule we used for DQN. 
+
+\subsection*{Trick: Noisy exploration policy}
+During training time, we want to use a policy which \emph{explores} the environment, generating diverse experience for us to learn from. We do this by adding random noise to our policy network output. Action selection during training is therefore implemented by:
+\begin{equation}\label{eq:noisy exploration policy}
+	S \mapsto \mu(S;\theta) + \mathcal{N}(0, \sigma^2)
+\end{equation}
+$\sigma^2$ controls the exploration level, with larger $\sigma^2$ indicating more exploration. It is analogous to $\epsilon$ for $\epsilon$-greedy action selection. We will also clip the action to be within the action space. 
+
+\subsection*{Conclusion: Putting it all together}
+DDPG proceeds through the following loop:
+\begin{enumerate}
+	\item Gather experience using an \textbf{noisy exploration policy} (\ref{eq:noisy exploration policy}) and load that experience into the \textbf{experience replay buffer}. 
+	\item Every $10$ interaction steps, randomly sample a \textbf{batch} of $N$ transitions from the replay buffer.
+	\begin{enumerate}
+		\item To train the value network form \textbf{regression targets} (\ref{eq:regression targets DDPG}) and minimise the \textbf{mean squared error loss} (\ref{eq:loss function for value network}).
+		\item To train the policy network, maximise the \textbf{mean action value objective} (\ref{eq:objective function for policy network}).
+	\end{enumerate} 
+	\item Every time you update the base parameters, perform \textbf{Polyak averaging} (\ref{eq:Polyak averaging}) to update the target network parameters.
+\end{enumerate}
+
+
+
+
+\end{document}

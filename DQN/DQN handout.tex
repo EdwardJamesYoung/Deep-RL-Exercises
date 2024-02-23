@@ -94,7 +94,7 @@
 \subsection*{Trick: Q-learning}
 Equation (\ref{eq:optimal policy from optimal values}) suggests the following strategy for getting good behaviour:
 \begin{enumerate}
-	\item Use a neural network called the \textbf{value network}, $Q(S,A;\phi)$,  to learn an approximation to $Q^*$, \ie, $Q(S,A;\phi) \approx Q^*(S,A)$ from data. The value network takes in states and outputs an estimate of the value of each action in that state. 
+	\item Use a neural network called the \textbf{value network}, $Q(S,A;\phi)$, to learn an approximation to $Q^*$, \ie, $Q(S,A;\phi) \approx Q^*(S,A)$ from data. The value network takes in states and outputs an estimate of the value of each action in that state. 
 	\item Motivated by (\ref{eq:optimal policy from optimal values}), select actions to maximise our approximation, \ie, pursue the policy $\mu$ given by 
 	\begin{equation}\label{eq:policy from approximate optimal values}
 		\mu(S) = \arg\max_A Q(S,A;\phi)

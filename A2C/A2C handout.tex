@@ -1,0 +1,142 @@
+\documentclass[]{article}
+
+% Formatting packages
+\usepackage[margin = 3cm]{geometry}
+\usepackage{parskip}
+
+% For writing psuedocode
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% Fonts and other symbols
+\usepackage{bm}
+\usepackage{mathtools}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+
+% Making pretty pictures
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+
+% Misc.
+\usepackage{hyperref}
+\usepackage{soul}
+
+% Linear Algebra Macros
+\newcommand{\Mat}{\mathrm{Mat}}
+\newcommand{\Img}{\mathrm{Img}}
+\newcommand{\Ker}{\mathrm{Ker}}
+\newcommand{\tr}{\mathrm{tr}}
+\newcommand{\adj}{\mathrm{adj}}
+\newcommand{\diag}{\mathrm{diag}}
+\newcommand{\tbt}[4]{\begin{pmatrix} #1 & #2 \\ #3 & #4 \end{pmatrix}}
+
+% Probability theory Macros
+\renewcommand{\P}{\mathbb{P}}
+\newcommand{\Cov}{\mathrm{Cov}}
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Poi}{\mathrm{Poisson}}
+\newcommand{\Geo}{\mathrm{Geo}}
+\newcommand{\Bin}{\mathrm{Bin}}
+\newcommand{\Bern}{\mathrm{Bern}}
+\newcommand{\iid}{\stackrel{\text{i.i.d.}}{\sim}}
+
+% Misc. 
+\newcommand{\defeq}{\vcentcolon =}
+\newcommand{\pd}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\dd}[2]{\frac{d #1}{d #2}}
+\newcommand{\dt}[1]{\frac{d #1}{dt}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\Z}{\mathbb{Z}}
+
+% Text Macros
+\newcommand{\etal}{\emph{et al.}}
+\newcommand{\eg}{\emph{e.g.}}
+\newcommand{\ie}{\emph{i.e.}}
+\newcommand{\etc}{\emph{etc.}}
+
+
+%opening
+\title{}
+\author{Edward Young \\ \large ey245@cam.ac.uk}
+\date{}
+
+\begin{document}
+
+\section*{Advantage Actor-Critic (A2C) \\ \small Edward Young - ey245@cam.ac.uk}
+
+\subsection*{Quick facts}
+\begin{enumerate}
+	\item A2C is an \emph{policy gradient method}. It learns a policy (an \emph{actor}) and a value function (a \emph{critic}).
+	\item A2C is \emph{on-policy}.
+	\item A2C is \emph{model-free}.
+	\item A2C is applicable to any kind of state space and action space.
+\end{enumerate}
+
+\subsection*{High-level strategy}
+Much like DDPG, A2C learns both a value network and a policy network. The value network is used to form \textbf{advantage estimates}. These advantage estimates are then used to critique action choices, allowing us to train the policy network. There are many different ways to use a value network to estimate advantage - we will cover a few of them here. \ul{The focus of today's tutorial is on general principles rather than a specific algorithm}. 
+
+\subsection*{Advantage estimation}
+Consider a learned (stochastic) policy $\pi(a|s;\theta)$, with state-value function $V_\pi(s)$ and action-value function $Q_\pi(s,a)$. The \textbf{advantage function} is defined by 
+\begin{equation}
+	A_\pi(s,a) = Q_\pi(s,a) - V_\pi(s)
+\end{equation}
+The advantage function measures the value of an action $a$ taken in state $s$ over and above the value of the state itself. Note that these are \emph{not} optimal value functions, but value functions for the policy. A \emph{positive} advantage indicates that an action is \emph{better} than the average action in that state, and a \emph{negative} advantage indicates that it is \emph{worse}.
+
+There are multiple ways to estimate advantage using a learned value function. We will discuss just a few of them here. First, suppose that we learn an approximate \emph{action}-value function $Q(s,a;\phi)$.
+\begin{itemize}
+	\item \emph{Action-value minus expected action-value}: $\hat{A}_t = Q(s_t,a_t;\phi) - \sum_a Q(s_t,a;\phi) \pi(a|s_t;\theta)$
+	%= Q(s_t,a_t;\phi) - \E_{a\sim\pi(\cdot|s_t)}\left[ Q(s_t, a; \phi) \right]
+\end{itemize}
+Second, suppose that we learn an approximate \emph{state}-value function $V(s;\phi)$. 
+\begin{itemize}
+	\item \emph{Centred return}: $\hat{A}_t = G_t - V(s_t;\phi) = \sum_{k \geq 1} \gamma^{k-1} r_{t+k} - V(s_t;\phi)$ 
+	\item \emph{Temporal difference (TD) error}: $\hat{A}_t = \delta_t = r_{t+1} + \gamma V(s_{t+1};\phi) - V(s_t;\phi)$
+	\item \emph{Generalised Advantage Estimation (GAE) with parameter} $\lambda$: $\hat{A}_t = \sum_{k \geq 0} (\lambda \gamma)^k \delta_{t+k}$
+\end{itemize}
+Bootstrapping introduces \emph{bias} into the advantage estimate, because our state-value function is only an approximation. However, it reduces \emph{variance} because it reduces the need to sample. Accordingly, the centred return has the lowest bias and highest variance, and the TD error has the highest bias and lowest variance. The GAE interpolates between the two, with $\lambda = 0$ giving the TD error and $\lambda = 1$ giving the centred return. 
+
+\newpage
+
+\subsection*{Training the policy network}
+
+We train the policy network by performing gradient \emph{ascent} on the objective:
+\begin{equation}\label{eq:objective function for policy network}
+	J(\theta) = \frac{1}{T} \sum_{t=t_0}^{T+t_0} \hat{A}_t \ln\left( \pi(a_t|s_t;\theta) \right) 
+\end{equation}
+where the sum is over $T$ \emph{consecutive} time steps, and the advantage estimates are treated as constants. Note that here we sample across \emph{time} rather than across a \emph{batch}. Ascent on this objective \emph{increases} the (log-)probability of actions with \emph{positive} advantage and \emph{decreases} the (log-)probability of actions with \emph{negative} advantage. This objective is derived from \textbf{the (stochastic) policy gradient theorem}.
+
+\subsection*{Training the value network}
+
+The value network used to form the advantage estimates can be trained using the same basic method that we've used to train value networks before in DQN and DDPG, namely performing gradient \emph{descent} on a mean squared error (MSE) loss. For concreteness, suppose we are training a state-value network $V(s;\phi)$. Then the loss is given by:
+\begin{equation}\label{eq:loss function for value network}
+	\mathcal{L}(\phi) = \frac{1}{T} \sum_{t=t_0}^{T+t_0} [ V(s_t;\phi) - y_t ]^2
+\end{equation}
+where $y_t$ are regression targets. These can be formed analogously to the advantage estimates:
+\begin{itemize}
+	\item \emph{return}, $y_t = G_t$
+	\item \emph{one-step truncated return}, $y_t = r_{t+1} + \gamma V(s_{t+1};\phi^-)$
+	\item $\lambda$-\emph{return}, $y_t = V(s_t;\phi^-) + \sum_{k\geq 0} (\lambda \gamma)^k \delta^-_{t+k}$ where $ \delta^-_{\tau} = r_{\tau+1} + \gamma V(s_{\tau+1};\phi^-) - V(s_{\tau};\phi^-)$
+\end{itemize} 
+where $V(s;\phi^-)$ is a \textbf{target network} which uses a \emph{lagged} set of parameters. These parameters could be updated with \textbf{Polyak averaging} or \textbf{synchronisation}. We might also use the target network to form the advantage estimates. 
+
+\subsection*{Trick: Parallel agents}
+
+With DQN and DDPG we used a memory replay buffer to decorrelate experience. A2C is \emph{on-policy}, so all datapoints must be generated using the current policy. We can decorrelate experience drawn from a single policy by using \ul{$N$ independent agents in parallel}. Each agent interacts with their own (independent) copy of the environment. We can then average the objective (\ref{eq:objective function for policy network}) and the loss (\ref{eq:loss function for value network}) across the trajectories pursued by different agents. 
+
+\subsection*{Conclusion: Putting it all together}
+Here are the key ideas behind Advantage Actor-Critic Methods:
+\begin{enumerate}
+	\item Gather experience by letting $N$ agents each interact with their own independent copy of the environment. 
+	\item Every $T$ time steps, form advantage estimates and regression targets using the learned value network (or target value network).
+	\item Aggregate experience across agents and time to form the value network loss (\ref{eq:loss function for value network}) and policy network objective (\ref{eq:objective function for policy network}).
+	\item Perform gradient descent on the loss and ascent on the objective, and use Polyak averaging to update the parameters of the target network (or synchronisation). 
+\end{enumerate}
+
+
+\end{document}
